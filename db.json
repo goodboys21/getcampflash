@@ -1,0 +1,11 @@
+{
+  "github": {
+    "token": "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", 
+    "owner": "codegood21",
+    "repo": "file",
+    "branch": "main"
+  },
+  "cdn": {
+    "base_url": "https://s.cloudgood.xyz/file"
+  }
+}
